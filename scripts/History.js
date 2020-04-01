@@ -89,7 +89,8 @@ mp.register_event("file-loaded", function() {
     }
 
     var name;
-    if (path.match(/^https?:\/\//) && !path.match(/^https?:\/\/([a-zA-Z0-9\-]\.)*youtube.com\//)) {
+    if (path.match(/^https?:\/\//) && !path.match(/^https?:\/\/([a-zA-Z0-9\-]+\.)*youtube.com\//)) {
+        print("HI")
         // non youtube http streaming
         // ignoring querystring and trailing slashes, take the decoded url after the last slash
         var qsStart = path.indexOf("?");
@@ -101,7 +102,7 @@ mp.register_event("file-loaded", function() {
         }
         var lastSlash = path.slice(0, qsStart).lastIndexOf("/"); // should never be -1
         name = decodeURIComponent(path.slice(lastSlash + 1, qsStart));
-    } else if (path.match(/^[a-zA-Z]:\/\//)) {
+    } else if (path.match(/^[a-zA-Z]+:\/\//)) {
         // everything else except local files
         name = mp.get_property("media-title");
     } else {
@@ -127,6 +128,7 @@ var paths;
 
 menu.setCallbackMenuOpen(function() {
     mp.commandv("loadfile", paths[menu.selectionIdx]);
+    setTimeout(function(){print(mp.get_property("filename"));},500);
     menu.hideMenu();
 });
 
