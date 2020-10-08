@@ -35,25 +35,32 @@ function modifyWithLock(file, lockfile, modify) {
             return "";
         }
     }
-    function loop() {
-        if (readIfExists(lockfile).length != 0) {
-            setTimeout(loop, 100);
-            return;
-        }
-        var key = mp.utils.getpid() + " " + Math.random();
-        mp.utils.write_file("file://" + lockfile, key);
-        setTimeout(function() {
-            if (readIfExists(lockfile) == key) {
-                mp.utils.write_file("file://" + file, modify(readIfExists(file)));
-                mp.utils.write_file("file://" + lockfile, "");
-            } else {
-                setTimeout(loop, 100);
-            }
-        }, 100);
-    }
-    loop();
+
+    // function loop() {
+    //     if (readIfExists(lockfile).length != 0) {
+    //         setTimeout(loop, 100);
+    //         return;
+    //     }
+    //     var key = mp.utils.getpid() + " " + Math.random();
+    //     mp.utils.write_file("file://" + lockfile, key);
+    //     setTimeout(function() {
+    //         if (readIfExists(lockfile) == key) {
+    //             mp.utils.write_file("file://" + file, modify(readIfExists(file)));
+    //             mp.utils.write_file("file://" + lockfile, "");
+    //         } else {
+    //             setTimeout(loop, 100);
+    //         }
+    //     }, 100);
+    // }
+    // loop();
+
+    // no lock
+    mp.utils.write_file("file://" + file, modify(readIfExists(file)));
+    return;
+
 }
 
+// mp.find_config_file is a thing but returns undefined if file does not already exist
 var configPath = (function() {
     var scriptFile = mp.get_script_file();
     var index = scriptFile.indexOf("/scripts/");
@@ -78,19 +85,21 @@ function parseHistoryString(historyString) {
     return lines;
 }
 
-mp.register_event("file-loaded", function() {
+mp.observe_property("path", "string", function(_, path) {
+    if (!path) {
+        return;
+    }
+
     // does not capture cookies or other http headers
     // unsure if possible to read these, or load a file with these without restarting mpv
     // if it is possible, would need log file to be in json format or something
 
-    var path = mp.get_property("path");
     if (!path.match(/^[a-zA-Z]+:\/\//)) {
         path = mp.utils.join_path(mp.get_property("working-directory"), path);
     }
 
     var name;
     if (path.match(/^https?:\/\//) && !path.match(/^https?:\/\/([a-zA-Z0-9\-]+\.)*youtube.com\//)) {
-        print("HI")
         // non youtube http streaming
         // ignoring querystring and trailing slashes, take the decoded url after the last slash
         var qsStart = path.indexOf("?");
@@ -147,7 +156,11 @@ menu.setCallbackMenuLeft(function() {
     names.splice(index, 1);
     paths.splice(index, 1);
     menu.setOptions(names);
-    menu.renderMenu();
+    if (paths.length > 0) {
+        menu.renderMenu();
+    } else {
+        menu.hideMenu();
+    }
 
     modifyWithLock(historyFile, lockFile, function(historyString) {
         var lines = parseHistoryString(historyString);
