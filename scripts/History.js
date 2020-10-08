@@ -26,37 +26,14 @@ mp.observe_property('vo-configured', 'bool', function(name, value) {
 
 // https://old.reddit.com/r/linuxquestions/comments/3t6s7k/mpv_history_of_recently_played_media/
 
-
-function modifyWithLock(file, lockfile, modify) {
-    function readIfExists(f) {
-        try {
-            return mp.utils.read_file(f);
-        } catch (e) {
-            return "";
-        }
+function modifyFile(file, modify) {
+    var contents;
+    try {
+        contents = mp.utils.read_file(file);
+    } catch (e) {
+        contents = "";
     }
-
-    // function loop() {
-    //     if (readIfExists(lockfile).length != 0) {
-    //         setTimeout(loop, 100);
-    //         return;
-    //     }
-    //     var key = mp.utils.getpid() + " " + Math.random();
-    //     mp.utils.write_file("file://" + lockfile, key);
-    //     setTimeout(function() {
-    //         if (readIfExists(lockfile) == key) {
-    //             mp.utils.write_file("file://" + file, modify(readIfExists(file)));
-    //             mp.utils.write_file("file://" + lockfile, "");
-    //         } else {
-    //             setTimeout(loop, 100);
-    //         }
-    //     }, 100);
-    // }
-    // loop();
-
-    // no lock
-    mp.utils.write_file("file://" + file, modify(readIfExists(file)));
-    return;
+    mp.utils.write_file("file://" + file, modify(contents));
 
 }
 
@@ -119,7 +96,7 @@ mp.observe_property("path", "string", function(_, path) {
         name = path.slice(path.lastIndexOf("/") + 1);
     }
 
-    modifyWithLock(historyFile, lockFile, function(historyString) {
+    modifyFile(historyFile, function(historyString) {
         var lines = parseHistoryString(historyString);
         var result = name + "\n" + path + "\n";
         for (var i = 0; i < lines.length / 2; i++) {
@@ -136,14 +113,19 @@ var names;
 var paths;
 
 menu.setCallbackMenuOpen(function() {
+    if (paths.length == 0) {
+        menu.hideMenu();
+        return;
+    }
+
     mp.commandv("loadfile", paths[menu.selectionIdx]);
-    setTimeout(function(){print(mp.get_property("filename"));},500);
     menu.hideMenu();
 });
 
 // delete a history entry by pressing left arrow on it
 menu.setCallbackMenuLeft(function() {
     if (paths.length == 0) {
+        menu.hideMenu();
         return;
     }
 
@@ -155,14 +137,14 @@ menu.setCallbackMenuLeft(function() {
     // do this first since obtaining a lock requires a delay
     names.splice(index, 1);
     paths.splice(index, 1);
-    menu.setOptions(names);
     if (paths.length > 0) {
+        menu.setOptions(names, index < paths.length ? index : index - 1);
         menu.renderMenu();
     } else {
         menu.hideMenu();
     }
 
-    modifyWithLock(historyFile, lockFile, function(historyString) {
+    modifyFile(historyFile, function(historyString) {
         var lines = parseHistoryString(historyString);
         var result = "";
         for (var i = 0; i < lines.length / 2; i++) {
